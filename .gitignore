@@ -1,3 +1,4 @@
+**/desktop.ini
 
 Semana 02/httpcantata\.amu\.edu\.pldownload\.php/Otros/Ananas_comosus_lncrnas\.fasta
 
@@ -1540,3 +1541,5 @@ Semana 05/tablas_hexamer/Vitis_vinifera\.tsv
 Base de datos/secuencias\.sql\.tar\.gz
 
 Base de datos/tesis2_secuencias_CDS\.sql\.tar\.gz
+/debug.log
+**/*.gsheet
