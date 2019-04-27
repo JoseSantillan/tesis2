@@ -16,6 +16,8 @@ def crear_modelo_referencial(identificador, tuned_parameters, scores, n_jobs):
     
     #print("levantamiento de features...")
     
+    util_caracteristicas.generar_modelo_CPAT(identificador, codigos_lncRNA.keys(), codigos_PCT.keys())
+    
     dict_features_lncRNA = util_caracteristicas.generar_caracteristicas(identificador, codigos_lncRNA)
     dict_features_PCT = util_caracteristicas.generar_caracteristicas(identificador, codigos_PCT)
     
