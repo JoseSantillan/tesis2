@@ -7,53 +7,51 @@ import util_caracteristicas, util_fasta
 from sklearn.preprocessing import StandardScaler
 from sklearn.externals.joblib import dump, load
 from sklearn.utils import shuffle
+import random
+
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
+import string
+from tempfile import mkdtemp
+
+class GeneradorFeatures(BaseEstimator, TransformerMixin):
+    def __init__(self, identificador=None):
+        self.identificador = identificador
+        self.random_id = identificador + "_fold_" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+        
+    def fit(self, X, y=None):
+        identificador = self.random_id
+        codigos_lncRNA = {}
+        codigos_PCT = {}
+        for i in range(len(X)):
+            if y[i] == 0:
+                codigos_PCT[X[i][0]] = X[i][1]
+            else:
+                codigos_lncRNA[X[i][0]] = X[i][1]
+        util_caracteristicas.generar_modelo_CPAT(identificador, codigos_lncRNA, codigos_PCT)
+        return self
+        
+    def transform(self, X):
+        identificador = self.random_id
+        codigos = {codigo[0]:codigo[1] for codigo in X}
+        dict_features = util_caracteristicas.generar_caracteristicas(identificador, codigos)
+
+        return [list(x.values()) for x in dict_features.values()]
 
 def crear_modelo_referencial(identificador, tuned_parameters, scores, n_jobs):
-    #print("lectura de archivos fasta...")
-    
     codigos_lncRNA = util_fasta.leer_fasta("./data/" + identificador + ".lncRNA.fasta")
     codigos_PCT = util_fasta.leer_fasta("./data/" + identificador + ".PCT.fasta")
     
-    #print("levantamiento de features...")
-    
-    util_caracteristicas.generar_modelo_CPAT(identificador, codigos_lncRNA.keys(), codigos_PCT.keys())
-    
-    dict_features_lncRNA = util_caracteristicas.generar_caracteristicas(identificador, codigos_lncRNA)
-    dict_features_PCT = util_caracteristicas.generar_caracteristicas(identificador, codigos_PCT)
-    
-    features_lncRNA = [list(x.values()) for x in dict_features_lncRNA.values()]
-    features_PCT = [list(x.values()) for x in dict_features_PCT.values()]
-    
-    #print("inicio generación del modelo...")
-    
-    X = features_lncRNA + features_PCT
-    y = ([1] * len(features_lncRNA)) + ([0] * len(features_PCT))
-    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=0)
+    X = list(codigos_lncRNA.items()) + list(codigos_PCT.items())
+    y = ([1] * len(codigos_lncRNA)) + ([0] * len(codigos_PCT))
     X_train, y_train = shuffle(X, y, random_state=0)
-    
-    #feature_scaler = StandardScaler()
-    #feature_scaler=load('./modelos_referenciales/feature_scaler_{}.bin'.format(identificador))
-    #X_train = feature_scaler.fit_transform(X_train)  
-    #X_test = feature_scaler.transform(X_test)
-    #dump(feature_scaler, './modelos_referenciales/feature_scaler_{}.bin'.format(identificador), compress=True)
+    cachedir = mkdtemp()
+    svm_pipeline = Pipeline(steps=[('features', GeneradorFeatures(identificador)), ('svc', SVC())], memory=cachedir)
     
     for score in scores:
-        #print("# Tuning hyper-parameters for %s" % score)
-        #print()
-
-        clf = GridSearchCV(SVC(), tuned_parameters, cv=10,
-                           scoring=score, n_jobs=n_jobs, refit="accuracy")
+        clf = GridSearchCV(svm_pipeline, tuned_parameters, cv=10, scoring=score, n_jobs=n_jobs, refit="accuracy")
         clf.fit(X_train, y_train)
-        dump(clf.best_estimator_, './modelos_referenciales/modelo_{}.pkl'.format(identificador), compress = 1)
-        #clf=load('./modelos_referenciales/{}.pkl'.format(identificador))
-
-        #print("Best parameters set found on development set:")
-        #print()
-        #print(clf.best_params_)
-        #print()
-        #print("Grid scores on development set:")
-        #print()
-        
         resultado = {
             "accuracy" : clf.cv_results_['mean_test_accuracy'][clf.best_index_],
             "precision" : clf.cv_results_['mean_test_precision'][clf.best_index_],
