@@ -1,136 +1,50 @@
 import os
-import util_bd, util_fasta
+import util_fasta
 from Bio.SeqUtils import GC
 import csv
 from sklearn.externals.joblib import dump, load
-import random
-import string
-import shutil
+#import random
+#import string
+#import shutil
 
-def generar_modelo_CPAT(identificador, codigos_lncRNA, codigos_PCT):
-    archivos = _rutas_archivos(identificador)
-    if os.path.isdir(archivos["cpat"]["directorio_base"]):
-        return
-    _generar_directorios_cpat(archivos)
-    _generar_data_cpat(archivos, codigos_lncRNA, codigos_PCT)
-    _generar_modelo_cpat(archivos)
+def generar_modelo_CPAT(archivo_lncRNA, archivo_PCT, archivo_CDS, carpeta_cpat):
+    _generar_modelo_CPAT_hexamer(archivo_lncRNA, archivo_CDS, carpeta_cpat)
+    _generar_modelo_CPAT_logit(archivo_lncRNA, archivo_PCT, carpeta_cpat)
 
-def generar_caracteristicas(identificador, transcritos):
-    archivos = _rutas_archivos(identificador)
-    if not os.path.isdir(archivos["cpat"]["directorio_base"]):
-        raise Exception("No se encontró la carpeta del modelo CPAT {}, probablemente aún no ha generado este modelo. Ruta buscada: {}".format(identificador, archivos["cpat"]["directorio_base"]))
-    _generar_transcritos_fasta(archivos, transcritos)
-    _generar_caracteristicas_cpat(archivos, archivos["transcritos_fasta"])
-    _generar_caracteristicas_diamond(archivos, archivos["transcritos_fasta"])
-    _generar_caracteristicas(archivos, transcritos)
-    _limpiar_archivos_cpat(archivos)
-
-def generar_caracteristicas_cpat(identificador, transcritos):
-    archivos = _rutas_archivos(identificador)
-    if not os.path.isdir(archivos["cpat"]["directorio_base"]):
-        raise Exception("No se encontró la carpeta del modelo CPAT {}, probablemente aún no ha generado este modelo. Ruta buscada: {}".format(identificador, archivos["cpat"]["directorio_base"]))
-    _generar_transcritos_fasta(archivos, transcritos)
-    _generar_caracteristicas_cpat(archivos, archivos["transcritos_fasta"])
-    _limpiar_archivos_cpat(archivos)
-    
-def existe_modelo_cpat(identificador):
-    archivos = _rutas_archivos(identificador)
-    return os.path.isdir(archivos["cpat"]["directorio_base"])
-    
-def _rutas_archivos(identificador):
-    if not os.path.isdir("./CPAT"):
-        os.mkdir("./CPAT")
-    if not os.path.isdir("./Diamond"):
-        os.mkdir("./Diamond")
-    if not os.path.isdir("./features"):
-        os.mkdir("./features")
-    
-    archivos = {}
-    archivos["cpat"] = { "directorio_base" : "./CPAT/{}".format(identificador) }
-    archivos["cpat"]["data"] = { "directorio" : "{}/data".format(archivos["cpat"]["directorio_base"]) }
-    archivos["cpat"]["data"]["lncRNA"] = "{}/lncRNA.fasta".format(archivos["cpat"]["data"]["directorio"])
-    archivos["cpat"]["data"]["PCT"] = "{}/PCT.fasta".format(archivos["cpat"]["data"]["directorio"])
-    archivos["cpat"]["data"]["CDS"] = "{}/CDS.fasta".format(archivos["cpat"]["data"]["directorio"])
-    archivos["cpat"]["modelo"] = { "directorio" : "{}/modelo".format(archivos["cpat"]["directorio_base"]) }
-    archivos["cpat"]["modelo"]["hexamer"] = "{}/hexamer.tsv".format(archivos["cpat"]["modelo"]["directorio"])
-    archivos["cpat"]["modelo"]["prefijo_logit"] = "{}/{}".format(archivos["cpat"]["modelo"]["directorio"], identificador)
-    archivos["cpat"]["modelo"]["logit"] = "{}.logit.RData".format(archivos["cpat"]["modelo"]["prefijo_logit"])
-    archivos["cpat"]["modelo"]["prefijo_cpat"] = "{}/{}".format(archivos["cpat"]["modelo"]["directorio"], identificador)
-    archivos["cpat"]["salida"] = "{}.dat".format(archivos["cpat"]["modelo"]["prefijo_cpat"])
-    archivos["cpat"]["scripts"] = {
-        "script_hexamer" : "~/anaconda3/bin/make_hexamer_tab.py",
-        "script_logit" : "~/anaconda3/bin/make_logitModel.py",
-        "script_cpat" : "~/anaconda3/bin/cpat.py"
-    }
-    archivos["diamond"] = { "directorio_base" : "./Diamond" }
-    archivos["diamond"]["bd"] = "{}_BD/uniprot-viridiplantae-reviewed.dmnd".format(archivos["diamond"]["directorio_base"])
-    archivos["diamond"]["script"] = "~/anaconda3/bin/diamond"
-    archivos["diamond"]["salida"] = "{}/{}.tsv".format(archivos["diamond"]["directorio_base"], identificador)
-    archivos["transcritos_fasta"] = "./data/{}.fasta".format(identificador)
-    archivos["features"] = { "directorio_base" : "./features"}
-    archivos["features"]["salida"] = "{}/{}.feat".format(archivos["features"]["directorio_base"], identificador)
-    return archivos
-    
-def _generar_directorios_cpat(archivos):
-    os.mkdir(archivos["cpat"]["directorio_base"])
-    os.mkdir(archivos["cpat"]["data"]["directorio"])
-    os.mkdir(archivos["cpat"]["modelo"]["directorio"])
-
-def _limpiar_archivos_cpat(archivos):
-    pass #shutil.rmtree(archivos["cpat"]["data"])
-
-def _generar_data_cpat(archivos, codigos_lncRNA, codigos_PCT):
-    query = "SELECT cod_secuencia, secuencia FROM secuencias WHERE cod_secuencia IN ('{}')".format("', '".join(codigos_lncRNA))
-    secuencias = util_bd.resultados_query(query)
-    util_fasta.generar_fasta(secuencias, archivos["cpat"]["data"]["lncRNA"])
-    query = "SELECT cod_secuencia, secuencia FROM secuencias WHERE cod_secuencia IN ('{}')".format("', '".join(codigos_PCT))
-    secuencias = util_bd.resultados_query(query)
-    util_fasta.generar_fasta(secuencias, archivos["cpat"]["data"]["PCT"])
-    query = "SELECT cod_secuencia, coding FROM secuencias_CDS WHERE cod_secuencia IN ('{}')".format("', '".join(codigos_PCT))
-    secuencias = util_bd.resultados_query(query)
-    util_fasta.generar_fasta(secuencias, archivos["cpat"]["data"]["CDS"])
-
-def _generar_modelo_cpat(archivos):
-    _generar_hexamer_cpat(archivos)
-    _generar_logit_cpat(archivos)
-    
-def _generar_hexamer_cpat(archivos):
-    script = archivos["cpat"]["scripts"]["script_hexamer"]
-    fasta_cds = "'" + archivos["cpat"]["data"]["CDS"] + "'" 
-    fasta_lncRNA = "'" + archivos["cpat"]["data"]["lncRNA"] + "'"
-    salida = "'" + archivos["cpat"]["modelo"]["hexamer"] + "'"
+def _generar_modelo_CPAT_hexamer(archivo_lncRNA, archivo_CDS, carpeta_cpat):
+    script = "~/anaconda3/bin/make_hexamer_tab.py"
+    fasta_cds = "'" + archivo_CDS + "'" 
+    fasta_lncRNA = "'" + archivo_lncRNA + "'"
+    salida = "'" + carpeta_cpat + "/hexamer.tsv" + "'"
     comando = "{} -c {} -n {} > {}".format(script, fasta_cds, fasta_lncRNA, salida)
     os.system(comando)
     
-def _generar_logit_cpat(archivos):
-    script = archivos["cpat"]["scripts"]["script_logit"]
-    hexamer = "'" + archivos["cpat"]["modelo"]["hexamer"] + "'"
-    fasta_pct = "'" + archivos["cpat"]["data"]["PCT"] + "'" 
-    fasta_lncRNA = "'" + archivos["cpat"]["data"]["lncRNA"] + "'"
-    salida = "'" + archivos["cpat"]["modelo"]["prefijo_logit"] + "'"
+def _generar_modelo_CPAT_logit(archivo_lncRNA, archivo_PCT, carpeta_cpat):
+    script = "~/anaconda3/bin/make_logitModel.py"
+    hexamer = "'" + carpeta_cpat + "/hexamer.tsv" + "'"
+    fasta_pct = "'" + archivo_PCT + "'" 
+    fasta_lncRNA = "'" + archivo_lncRNA + "'"
+    salida = "'" + carpeta_cpat + "/fold" + "'"
     comando = "{} -x {} -c {} -n {} -o {}".format(script, hexamer, fasta_pct, fasta_lncRNA, salida)
     os.system(comando)
-
-def _generar_transcritos_fasta(archivos, transcritos):
-    transcritos_array = transcritos.items()
-    util_fasta.generar_fasta(transcritos_array, archivos["transcritos_fasta"])
     
-def _generar_caracteristicas_cpat(archivos, transcritos_fasta):
-    script = archivos["cpat"]["scripts"]["script_cpat"]
-    logit = "'" + archivos["cpat"]["modelo"]["logit"] + "'"
-    hexamer = "'" + archivos["cpat"]["modelo"]["hexamer"] + "'"
-    salida = "'" + archivos["cpat"]["modelo"]["prefijo_cpat"] + "'"
-    comando = "{} -g {} -d {} -x {} -o {}".format(script, transcritos_fasta, logit, hexamer, salida)
+def ejecutar_diamond(archivo_entrada, diamond_db, archivo_salida):
+    script = "~/anaconda3/bin/diamond"
+    diamond_bd = "'" + diamond_db + "'"
+    salida = "'" + archivo_salida + "'"
+    comando = "{} blastx -d {} -q {} -o {} -k 5 --gapopen 11 --gapextend 1 --more-sensitive -f 6 qseqid pident length qframe qstart qend sstart send evalue bitscore".format(script, diamond_bd, archivo_entrada, salida)
     os.system(comando)
 
-def _generar_caracteristicas_diamond(archivos, transcritos_fasta):
-    script = archivos["diamond"]["script"]
-    diamond_bd = "'" + archivos["diamond"]["bd"] + "'"
-    salida = "'" + archivos["diamond"]["salida"] + "'"
-    comando = "{} blastx -d {} -q {} -o {} -k 5 --gapopen 11 --gapextend 1 --more-sensitive -f 6 qseqid pident length qframe qstart qend sstart send evalue bitscore".format(script, diamond_bd, transcritos_fasta, salida)
+def ejecutar_cpat(archivo_entrada, carpeta_cpat, archivo_salida):
+    script = "~/anaconda3/bin/cpat.py"
+    logit = "'" + carpeta_cpat + "/fold.logit.RData" + "'"
+    hexamer = "'" + carpeta_cpat + "/hexamer.tsv" + "'"
+    salida = "'" + archivo_salida + "'"
+    comando = "{} -g {} -d {} -x {} -o {}".format(script, archivo_entrada, logit, hexamer, salida)
     os.system(comando)
-
-def _generar_caracteristicas(archivos, transcritos):
+    
+def generar_features_base(archivo_entrada, archivo_cpat, archivo_diamond, archivo_salida):
+    transcritos = util_fasta.leer_fasta(archivo_entrada)
     transcript_dict = {}
     for k in transcritos.keys():
         transcript_dict[k.strip().upper()] = {
@@ -146,8 +60,10 @@ def _generar_caracteristicas(archivos, transcritos):
             "align_perc_orf" : float(0)
         }
     
-    with open(archivos["cpat"]["salida"], "r") as f:
+    #adaptado de https://github.com/gbgolding/crema/blob/master/bin/featuresetup_module.py
+    with open(archivo_cpat, "r") as f:
         cpat_reader = csv.reader(f, delimiter=("\t"))
+        next(cpat_reader, None) # skip header
         for row in cpat_reader:
             cod_secuencia = row[0]
             transcript_dict[cod_secuencia]["orf_length"] = float(row[2])
@@ -155,8 +71,7 @@ def _generar_caracteristicas(archivos, transcritos):
             transcript_dict[cod_secuencia]["fickett_score"] = float(row[3])
             transcript_dict[cod_secuencia]["hexamer_score"] = float(row[4])
     
-    #adaptado de https://github.com/gbgolding/crema/blob/master/bin/featuresetup_module.py
-    with open(archivos["diamond"]["salida"], "r") as f:
+    with open(archivo_diamond, "r") as f:
         tab_reader = csv.reader(f, delimiter=("\t"))
         line_1 = next(tab_reader)
         first = line_1[0].upper()
@@ -190,17 +105,11 @@ def _generar_caracteristicas(archivos, transcritos):
             transcript_dict[first]["align_length"] = float(max_len_ident[2])
     #fin de código adaptado de https://github.com/gbgolding/crema/blob/master/bin/featuresetup_module.py
     
-    dump(transcript_dict, archivos["features"]["salida"])
+    dump(transcript_dict, archivo_salida)
 
-def obtener_caracteristicas(identificador, id_cpat, transcritos):
-    archivos = _rutas_archivos(identificador)
-    archivos_cpat = _rutas_archivos(id_cpat)
-    if not os.path.isfile(archivos["features"]["salida"]):
-        raise Exception("Debe primero generar la base de datos de caracteristicas " + identificador)
-    if not os.path.isfile(archivos_cpat["cpat"]["salida"]):
-        raise Exception("Debe primero generar la base de datos de caracteristicas para CPAT " + id_cpat)
-    
-    features_globales = load(archivos["features"]["salida"])
+def generar_features(archivo_entrada, features_base, archivo_cpat, archivo_salida):
+    transcritos = util_fasta.leer_fasta(archivo_entrada)
+    features_globales = load(features_base)
     transcript_dict = {}
     for k in transcritos.keys():
         transcript_dict[k.strip().upper()] = {
@@ -216,12 +125,13 @@ def obtener_caracteristicas(identificador, id_cpat, transcritos):
             "align_perc_orf" : features_globales[k.strip().upper()]["align_perc_orf"]
         }
     
-    with open(archivos_cpat["cpat"]["salida"], "r") as f:
+    with open(archivo_cpat, "r") as f:
         cpat_reader = csv.reader(f, delimiter=("\t"))
+        next(cpat_reader, None) # skip header
         for row in cpat_reader:
             cod_secuencia = row[0].strip().upper()
             if cod_secuencia in transcript_dict:
                 transcript_dict[cod_secuencia]["fickett_score"] = float(row[3])
                 transcript_dict[cod_secuencia]["hexamer_score"] = float(row[4])
-    
-    return transcript_dict
+                
+    dump(transcript_dict, archivo_salida)

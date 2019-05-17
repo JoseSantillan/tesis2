@@ -134,7 +134,9 @@ def crear_modelo_final(especies, tuned_parameters, scores, n_jobs):
     
     generar_features_generales(X_train, y_train)
     print("Prepocesamiento de transcritos previos al entrenamiento del modelo final")
-    Parallel(n_jobs=n_jobs, verbose=0)(delayed(generar_fit)(X, y) for X, y in obtener_folds(ps, X_train, y_train))
+    #Parallel(n_jobs=n_jobs, verbose=0)(delayed(generar_fit)(X, y) for X, y in obtener_folds(ps, X_train, y_train))
+    for _X_train, _y_train in obtener_folds(ps, X_train, y_train):
+        generar_fit(_X_train, _y_train)
     
     for score in scores:
         print("Entrenamiento del modelo con grid search")
