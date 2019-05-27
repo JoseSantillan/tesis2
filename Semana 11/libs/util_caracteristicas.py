@@ -3,9 +3,6 @@ import util_fasta
 from Bio.SeqUtils import GC
 import csv
 from sklearn.externals.joblib import dump, load
-#import random
-#import string
-#import shutil
 
 def generar_modelo_CPAT(archivo_lncRNA, archivo_PCT, archivo_CDS, carpeta_cpat):
     _generar_modelo_CPAT_hexamer(archivo_lncRNA, archivo_CDS, carpeta_cpat)
