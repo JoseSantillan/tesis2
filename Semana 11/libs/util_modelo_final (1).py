@@ -554,7 +554,7 @@ class Tesis2():
         y_pred = np.concatenate((y_pred_lncRNA, y_pred_PCT))
         
         plt.figure(1)
-        probs = np.concatenate((probs_lncRNA, probs_PCT))
+        probs = np.concatenate((probs_lncRNA[:,1], probs_PCT[:,1]))
         precision, recall, _ = precision_recall_curve(y_true, probs)
         average_precision = average_precision_score(y_true, probs)
         plt.step(recall, precision, color='b', alpha=0.2, where='post')

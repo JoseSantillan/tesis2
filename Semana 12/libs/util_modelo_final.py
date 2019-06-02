@@ -554,7 +554,7 @@ class Tesis2():
         y_pred = np.concatenate((y_pred_lncRNA, y_pred_PCT))
         
         plt.figure(1)
-        probs = np.concatenate((probs_lncRNA, probs_PCT))
+        probs = np.concatenate((probs_lncRNA[:,1], probs_PCT[:,1]))
         precision, recall, _ = precision_recall_curve(y_true, probs)
         average_precision = average_precision_score(y_true, probs)
         plt.step(recall, precision, color='b', alpha=0.2, where='post')
@@ -577,7 +577,7 @@ class Tesis2():
         plt.title('Receiver Operating Characteristic')
         plt.legend(loc="lower right")
         
-        return classification_report(y_true, y_pred, target_names=["PCT", "lncRNA"]), confusion_matrix(y_true, y_pred), precision_recall_fscore_support(y_true, y_pred, average='binary'), y_true, y_pred, probs, recall, precision, average_precision, fpr, tpr, roc_auc
+        return classification_report(y_true, y_pred, target_names=["PCT", "lncRNA"]), confusion_matrix(y_true, y_pred), precision_recall_fscore_support(y_true, y_pred, average='binary')
         
     def reportar_predicciones_keras(self, archivo_lncRNA, archivo_PCT):
         y_pred_lncRNA = self.realizar_predicciones(archivo_lncRNA)
@@ -612,7 +612,7 @@ class Tesis2():
         plt.title('Receiver Operating Characteristic')
         plt.legend(loc="lower right")
         
-        return classification_report(y_true, y_pred, target_names=["PCT", "lncRNA"]), confusion_matrix(y_true, y_pred), precision_recall_fscore_support(y_true, y_pred, average='binary'), y_true, y_pred, probs, recall, precision, average_precision, fpr, tpr, roc_auc
+        return classification_report(y_true, y_pred, target_names=["PCT", "lncRNA"]), confusion_matrix(y_true, y_pred), precision_recall_fscore_support(y_true, y_pred, average='binary')
         
     def realizar_predicciones(self, archivo_fasta, features_calculados=False):
         predictor = load(self.carpeta_modelo() + "/modelo_final.plk")
